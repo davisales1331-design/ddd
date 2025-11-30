@@ -9,7 +9,7 @@ local toggles = { box = false, name = false, life = false }
 local L_SIZE = 12
 local LIFE_BAR_OFFSET = 30
 
-function getCorners(char)
+local function getCorners(char)
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     local c = hrp.Position
@@ -23,7 +23,11 @@ function getCorners(char)
     }
 end
 
-function createESP(char, plr)
+local function isDrawing(v)
+    return typeof(v) == "Drawing" or typeof(v) == "Instance"
+end
+
+local function createESP(char, plr)
     local id = char:GetDebugId()
     if ESP_Renders[id] then return end
     local lines = {}
@@ -41,23 +45,35 @@ function createESP(char, plr)
     ESP_Renders[id] = {L=lines, name=name, lifebar=lifebar, lifenum=lifenum, Char=char, Plr=plr}
 end
 
-function removeESP(char)
+local function removeESP(char)
     local id = char:GetDebugId()
     local tbl = ESP_Renders[id]
     if not tbl then return end
-    for k,v in pairs(tbl) do if typeof(v)=="table" then for _,d in pairs(v) do d:Remove() end elseif typeof(v)=="Instance" or typeof(v)=="Drawing" then v:Remove() end end
+    for k,v in pairs(tbl) do
+        if typeof(v) == "table" then
+            for _,d in pairs(v) do if isDrawing(d) then d:Remove() end end
+        elseif isDrawing(v) then
+            v:Remove()
+        end
+    end
     ESP_Renders[id]=nil
 end
 
-function clearESP()
+local function clearESP()
     for _,tbl in pairs(ESP_Renders) do
-        for k,v in pairs(tbl) do if typeof(v)=="table" then for _,d in pairs(v) do d:Remove() end elseif typeof(v)=="Instance" or typeof(v)=="Drawing" then v:Remove() end end
+        for k,v in pairs(tbl) do
+            if typeof(v) == "table" then
+                for _,d in pairs(v) do if isDrawing(d) then d:Remove() end end
+            elseif isDrawing(v) then
+                v:Remove()
+            end
+        end
     end
     ESP_Renders = {}
 end
 
-function updateESP()
-    for id,tbl in pairs(ESP_Renders) do
+local function updateESP()
+    for id, tbl in pairs(ESP_Renders) do
         local char = tbl.Char
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if not char or not hum or hum.Health <= 0 or not char:FindFirstChild("HumanoidRootPart") then
