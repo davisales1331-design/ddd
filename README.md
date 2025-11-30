@@ -23,7 +23,7 @@ local function get3DBoxCorners(char)
     return v
 end
 
-local function createESP(char, plr)
+local function createESP(char,plr)
     local id = char:GetDebugId()
     if ESP_Renders[id] then return end
     local lines = {}
@@ -33,81 +33,82 @@ local function createESP(char, plr)
         lines[i.."H"] = lh
         lines[i.."V"] = lv
     end
-    ESP_Renders[id.."L"] = lines
     local name = Drawing.new("Text")
     name.Size=14 name.Center=true name.Outline=true name.Color=Color3.fromRGB(255,255,255) name.Visible=false
-    ESP_Renders[id.."name"] = name
     local lifebar = Drawing.new("Line")
     lifebar.Thickness=6 lifebar.Color=Color3.fromRGB(0,255,0) lifebar.Visible=false
-    ESP_Renders[id.."lifebar"]=lifebar
     local lifenum = Drawing.new("Text")
     lifenum.Size=14 lifenum.Center=true lifenum.Outline=true lifenum.Color=Color3.fromRGB(0,255,0) lifenum.Rotation=180 lifenum.Visible=false
-    ESP_Renders[id.."lifenum"]=lifenum
+    ESP_Renders[id] = {
+        L=lines,
+        name=name,
+        lifebar=lifebar,
+        lifenum=lifenum,
+    }
 end
 
 local function removeESP(char)
-    local id=char:GetDebugId()
-    for k,v in pairs(ESP_Renders) do
-        if string.find(k,id) then
-            if k:find("L") then for _,l in pairs(v) do l:Remove() end else v:Remove() end
-            ESP_Renders[k]=nil
-        end
+    local id = char:GetDebugId()
+    local tbl = ESP_Renders[id]
+    if not tbl then return end
+    for k,v in pairs(tbl) do
+        if typeof(v)=="table" then for _,d in pairs(v) do d:Remove() end else v:Remove() end
     end
+    ESP_Renders[id]=nil
 end
 
 local function clearESP()
-    for k,v in pairs(ESP_Renders) do
-        if k:find("L") then for _,l in pairs(v) do l:Remove() end else v:Remove() end
+    for _,tbl in pairs(ESP_Renders) do
+        for k,v in pairs(tbl) do
+            if typeof(v)=="table" then for _,d in pairs(v) do d:Remove() end else v:Remove() end
+        end
     end
     ESP_Renders = {}
 end
 
 local function updateESP()
+    local exists = {}
     for _,plr in ipairs(Players:GetPlayers()) do
         if plr==LocalPlayer then continue end
-        local char=plr.Character
-        local hum=char and char:FindFirstChildOfClass("Humanoid")
-        if hum and hum.Health>0 and char:FindFirstChild("HumanoidRootPart") then
+        local char = plr.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health > 0 and char:FindFirstChild("HumanoidRootPart") then
             if toggles.box or toggles.name or toggles.life then createESP(char,plr) end
-            local id=char:GetDebugId()
-            local Ls=ESP_Renders[id.."L"]
-            local name=ESP_Renders[id.."name"]
-            local lifebar=ESP_Renders[id.."lifebar"]
-            local lifenum=ESP_Renders[id.."lifenum"]
+            local id = char:GetDebugId()
+            exists[id] = true
+            local tbl = ESP_Renders[id]
+            if not tbl then continue end
+            local Ls=tbl.L
+            local name=tbl.name
+            local lifebar=tbl.lifebar
+            local lifenum=tbl.lifenum
             local v=get3DBoxCorners(char)
             if not v then for i=1,4 do Ls[i.."H"].Visible=false Ls[i.."V"].Visible=false end name.Visible=false lifebar.Visible=false lifenum.Visible=false continue end
             local vp=function(vec) local p,u=Camera:WorldToViewportPoint(vec) return Vector2.new(p.X,p.Y),u end
             local pTL,u1=vp(v.TL) local pTR,u2=vp(v.TR) local pBR,u3=vp(v.BR) local pBL,u4=vp(v.BL)
             if not(u1 and u2 and u3 and u4) then for i=1,4 do Ls[i.."H"].Visible=false Ls[i.."V"].Visible=false end name.Visible=false lifebar.Visible=false lifenum.Visible=false continue end
-            -- L nos cantos
             local L=L_SIZE
-            -- Top-Left
             Ls["1H"].From = pTL Ls["1H"].To = pTL+Vector2.new(L,0)
+            Ls["1H"].Color = Color3.fromRGB(255,255,0)
             Ls["1V"].From = pTL Ls["1V"].To = pTL+Vector2.new(0,L)
             Ls["1V"].Color = Color3.fromRGB(0,255,0)
-            -- Top-Right
             Ls["2H"].From = pTR Ls["2H"].To = pTR-Vector2.new(L,0)
             Ls["2V"].From = pTR Ls["2V"].To = pTR+Vector2.new(0,L)
             Ls["2V"].Color = Color3.fromRGB(255,255,0)
-            -- Bottom-Right
             Ls["3H"].From = pBR Ls["3H"].To = pBR-Vector2.new(L,0)
             Ls["3V"].From = pBR Ls["3V"].To = pBR-Vector2.new(0,L)
             Ls["3V"].Color = Color3.fromRGB(255,255,0)
-            -- Bottom-Left
             Ls["4H"].From = pBL Ls["4H"].To = pBL+Vector2.new(L,0)
             Ls["4V"].From = pBL Ls["4V"].To = pBL-Vector2.new(0,L)
             Ls["4V"].Color = Color3.fromRGB(0,255,0)
             for i=1,4 do Ls[i.."H"].Visible=toggles.box Ls[i.."V"].Visible=toggles.box end
-            -- Nome no topo centro
             name.Position=Vector2.new((pTL.X+pTR.X)/2, pTL.Y-16)
             name.Text=plr.Name
             name.Visible=toggles.name
-            -- Barra de vida
             if toggles.life then
                 local ratio=math.max(0,math.min(1,hum.Health/hum.MaxHealth))
                 local barYmin = (pTL.Y+pBL.Y)/2
                 local barYmax = (pTR.Y+pBR.Y)/2
-                local barLen = math.abs(barYmax-barYmin)
                 local barTop = pTL
                 local barBot = pBL
                 local filledEnd = Vector2.new(barTop.X, barTop.Y + (barBot.Y-barTop.Y)*ratio)
@@ -121,15 +122,29 @@ local function updateESP()
                 lifebar.Visible=false
                 lifenum.Visible=false
             end
-        else
-            if char then removeESP(char) end
         end
+    end
+    for id,obj in pairs(ESP_Renders) do
+        if not exists[id] then removeESP({GetDebugId=function() return id end}) end
     end
 end
 
-Players.PlayerAdded:Connect(function(plr) plr.CharacterAdded:Connect(function(char) if toggles.box or toggles.name or toggles.life then createESP(char,plr) end end) end)
-for _,plr in ipairs(Players:GetPlayers()) do if plr~=LocalPlayer and plr.Character then if toggles.box or toggles.name or toggles.life then createESP(plr.Character,plr) end end plr.CharacterAdded:Connect(function(char) if toggles.box or toggles.name or toggles.life then createESP(char,plr) end end) end
-Players.PlayerRemoving:Connect(function(plr) if plr~=LocalPlayer and plr.Character then removeESP(plr.Character) end end)
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function(char)
+        if toggles.box or toggles.name or toggles.life then createESP(char,plr) end
+    end)
+end)
+for _,plr in ipairs(Players:GetPlayers()) do
+    if plr~=LocalPlayer and plr.Character then
+        if toggles.box or toggles.name or toggles.life then createESP(plr.Character,plr) end
+    end
+    plr.CharacterAdded:Connect(function(char)
+        if toggles.box or toggles.name or toggles.life then createESP(char,plr) end
+    end)
+end
+Players.PlayerRemoving:Connect(function(plr)
+    if plr~=LocalPlayer and plr.Character then removeESP(plr.Character) end
+end)
 RunService.RenderStepped:Connect(updateESP)
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
