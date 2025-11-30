@@ -7,17 +7,18 @@ local LIFE_BAR_OFFSET = 30
 local ESP_Renders = {}
 local toggles = { box = false, name = false, life = false }
 
-local function get3DBoxCorners(char)
+local function getBoxAroundHRP(char)
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-    local c = hrp.Position
     local size = char:GetExtentsSize()
-    local sx, sy, sz = size.X/2, size.Y/2, size.Z/2
+    local c = hrp.Position
+    local sx, sy = size.X/2, size.Y/2
     return {
-        TL = c + Vector3.new(-sx, sy, -sz),
-        TR = c + Vector3.new(sx, sy, -sz),
-        BR = c + Vector3.new(sx, -sy, -sz),
-        BL = c + Vector3.new(-sx, -sy, -sz)
+        TL = c + Vector3.new(-sx, sy, 0),
+        TR = c + Vector3.new(sx, sy, 0),
+        BR = c + Vector3.new(sx, -sy, 0),
+        BL = c + Vector3.new(-sx, -sy, 0),
+        Center = c,
     }
 end
 
@@ -87,29 +88,42 @@ local function updateESP()
             local name=tbl.name
             local lifebar=tbl.lifebar
             local lifenum=tbl.lifenum
-            local v=get3DBoxCorners(char)
-            if not v then for i=1,4 do Ls[i.."H"].Visible=false Ls[i.."V"].Visible=false end name.Visible=false lifebar.Visible=false lifenum.Visible=false continue end
+            local v=getBoxAroundHRP(char)
             local vp=function(vec) local p,u=Camera:WorldToViewportPoint(vec) return Vector2.new(p.X,p.Y),u end
-            local pTL,u1=vp(v.TL) local pTR,u2=vp(v.TR) local pBR,u3=vp(v.BR) local pBL,u4=vp(v.BL)
-            if not(u1 and u2 and u3 and u4) then for i=1,4 do Ls[i.."H"].Visible=false Ls[i.."V"].Visible=false end name.Visible=false lifebar.Visible=false lifenum.Visible=false continue end
-            local L=L_SIZE
-            Ls["1H"].From = pTL Ls["1H"].To = pTL+Vector2.new(L,0)
-            Ls["1H"].Color = Color3.fromRGB(255,255,0)
-            Ls["1V"].From = pTL Ls["1V"].To = pTL+Vector2.new(0,L)
-            Ls["1V"].Color = Color3.fromRGB(0,255,0)
-            Ls["2H"].From = pTR Ls["2H"].To = pTR-Vector2.new(L,0)
-            Ls["2V"].From = pTR Ls["2V"].To = pTR+Vector2.new(0,L)
-            Ls["2V"].Color = Color3.fromRGB(255,255,0)
-            Ls["3H"].From = pBR Ls["3H"].To = pBR-Vector2.new(L,0)
-            Ls["3V"].From = pBR Ls["3V"].To = pBR-Vector2.new(0,L)
-            Ls["3V"].Color = Color3.fromRGB(255,255,0)
-            Ls["4H"].From = pBL Ls["4H"].To = pBL+Vector2.new(L,0)
-            Ls["4V"].From = pBL Ls["4V"].To = pBL-Vector2.new(0,L)
-            Ls["4V"].Color = Color3.fromRGB(0,255,0)
-            for i=1,4 do Ls[i.."H"].Visible=toggles.box Ls[i.."V"].Visible=toggles.box end
+            local pTL,uTL=vp(v.TL) local pTR,uTR=vp(v.TR) local pBR,uBR=vp(v.BR) local pBL,uBL=vp(v.BL)
+            local pCenter,uCenter=vp(v.Center)
+            if not uCenter then
+                for i=1,4 do Ls[i.."H"].Visible=false Ls[i.."V"].Visible=false end
+                name.Visible=false lifebar.Visible=false lifenum.Visible=false
+                continue
+            end
+            -- Mesmo se corners invisíveis, sempre desenha no HRP!
+            local L = L_SIZE
+            local showBox = toggles.box
+            for i=1,4 do Ls[i.."H"].Visible=false Ls[i.."V"].Visible=false end
+            if showBox and uTL and uTR and uBL and uBR then
+                -- Top-Left
+                Ls["1H"].From = pTL Ls["1H"].To = pTL+Vector2.new(L,0)
+                Ls["1H"].Color = Color3.fromRGB(255,255,0)
+                Ls["1V"].From = pTL Ls["1V"].To = pTL+Vector2.new(0,L)
+                Ls["1V"].Color = Color3.fromRGB(0,255,0)
+                -- Top-Right
+                Ls["2H"].From = pTR Ls["2H"].To = pTR-Vector2.new(L,0)
+                Ls["2V"].From = pTR Ls["2V"].To = pTR+Vector2.new(0,L)
+                Ls["2V"].Color = Color3.fromRGB(255,255,0)
+                -- Bottom-Right
+                Ls["3H"].From = pBR Ls["3H"].To = pBR-Vector2.new(L,0)
+                Ls["3V"].From = pBR Ls["3V"].To = pBR-Vector2.new(0,L)
+                Ls["3V"].Color = Color3.fromRGB(255,255,0)
+                -- Bottom-Left
+                Ls["4H"].From = pBL Ls["4H"].To = pBL+Vector2.new(L,0)
+                Ls["4V"].From = pBL Ls["4V"].To = pBL-Vector2.new(0,L)
+                Ls["4V"].Color = Color3.fromRGB(0,255,0)
+                for i=1,4 do Ls[i.."H"].Visible=true Ls[i.."V"].Visible=true end
+            end
             name.Position=Vector2.new((pTL.X+pTR.X)/2, pTL.Y-16)
             name.Text=plr.Name
-            name.Visible=toggles.name
+            name.Visible=toggles.name and uTL and uTR
             if toggles.life then
                 local ratio=math.max(0,math.min(1,hum.Health/hum.MaxHealth))
                 local barTop = Vector2.new(pTL.X-LIFE_BAR_OFFSET, pTL.Y)
@@ -117,10 +131,10 @@ local function updateESP()
                 local filledEnd = Vector2.new(barTop.X, barTop.Y + (barBot.Y-barTop.Y)*ratio)
                 lifebar.From = barTop
                 lifebar.To = filledEnd
-                lifebar.Visible=true
+                lifebar.Visible=uTL and uBL
                 lifenum.Position=Vector2.new(barTop.X-14,barBot.Y)
                 lifenum.Text = math.floor(ratio*100).."%"
-                lifenum.Visible=true
+                lifenum.Visible=uBL
             else
                 lifebar.Visible=false
                 lifenum.Visible=false
@@ -163,13 +177,11 @@ local Window = Fluent:CreateWindow{
     Theme = "Darker",
     MinimizeKey = Enum.KeyCode.Insert
 }
-
 local Tabs = {
     Visual = Window:AddTab{ Title = "Visual", Icon = "" },
     Mira = Window:AddTab{ Title = "Mira", Icon = "" },
     Player = Window:AddTab{ Title = "Player", Icon = "" }
 }
-
 Tabs.Visual:AddToggle("ESPBoxToggle", {
     Title = "ESP Box L",
     Callback = function(state)
